@@ -1,4 +1,4 @@
-//States of the game tell help the program know what code to run and when
+// States of the game help the program know what code to run and when
 enum gameState {
   START, LEVEL1, LEVEL2, DEAD, COMPLETE, PLAYING, TRANSITION
 };
@@ -30,7 +30,7 @@ int canvasHeight = 563;
 //Variables for the grid of boxes on Level 1
 int numRows = 5;
 int numCols = 10;
-int gap = 5;//Gap beteween boxes
+int gap = 5; //Gap beteween boxes
 float paddingX = 100; // Gap between grid to side of screen
 float paddingY = 50; // Gap between grid and top of screen
 float bottomPadding = 300; // Gap between grid and bottom of screen
@@ -61,12 +61,23 @@ ArrayList<Bat> breakingObstacles = new ArrayList<Bat>();
 ArrayList<Ball> balls;
 ArrayList<Effect> effects;
 
+//Temporary arraylists to store objects to be added/removed
+ArrayList<Ball> newBalls;
+ArrayList<Ball> removeBalls;
+ArrayList<Bat> addObstacles;
+
+/**
+  * The setup method is called once when the game is first loaded
+  *
+  * The main purpose of the setup function is to setup up all the assets 
+  * for the game, including the canvas, as well as spawn in the objects
+ */
 void setup() {
-  
+
   //Makes sure all the images are loaded
-  Bat loadBat = new Bat(0,0,0,0,"no",0);
-  Ball loadBall = new Ball(0,0,0);
-  
+  Bat loadBat = new Bat(0, 0, 0, 0, "no", 0);
+  Ball loadBall = new Ball(0, 0, 0);
+
   //Specifications of canvas
   size(1000, 563);
   imageMode(CENTER);
@@ -87,79 +98,118 @@ void setup() {
   state = gameState.START;
 }
 
+/**
+  * This method is the main functionality of the game, it is called each game tick
+  *
+  * Depending on what state the game is in, this method will call the relevant code
+  */
 void draw() {
 
-  /**
-    * This method is the brains of my game. Depending on which state the program is in, the relevant code is deployed
-  */
-  
-  //Just draws the start screen
-  if (state == gameState.START) {
+  //Draws the end screens
+  if (state == gameState.START || state == gameState.DEAD || state == gameState.COMPLETE) {
     cursor(HAND);
-    drawStartScreen();
+    drawStartDeathWinScreen(state);
   }
   //Constructs level 1, Resets all objects and arraylists
   else if (state == gameState.LEVEL1) {
-    numOfMulti = 0;
-    numOfSpeed = 0;
-    noCursor();
-    ballSpeedTime = -1;
-    bg.reset();
-    level = 1;
-    balls = new ArrayList<Ball>();
-    ball = new Ball(40, 300, 10);
-    balls.add(ball);
-    createLevelOne();
-    bat = new Bat(120, 20, mouseX, mouseY, "mouse", 0);
-
-    //Changes game state to playing
-    state = gameState.PLAYING;
-  } 
+    createLevel(1);
+  }
   //Contructs Level 2, resets all objects and arraylists
   else if (state == gameState.LEVEL2) {
-    numOfMulti = 0;
-    numOfSpeed = 0;
-    noCursor();
-    ballSpeedTime = -1;
-    level = 2;
-    balls = new ArrayList<Ball>();
-    ball = new Ball(40, 300, 10);
-    balls.add(ball);
-    bat = new Bat(120, 20, mouseX, mouseY, "mouse", 0);
-    createLevelTwo();
-    
-    //Sets game state to playing
-    state = gameState.PLAYING;
-  } 
-  //Just draws the death screen
-  else if (state == gameState.DEAD) {
-    cursor(HAND);
-    drawDeathScreen();
-  } 
-  //Just draws the win screen
-  else if (state == gameState.COMPLETE) {
-    cursor(HAND);
-    complete();
-  } 
+    createLevel(2);
+  }
   //Plays the transition between level 1 and 2. The cooldown ensures that it isn't interrupted
   else if (state == gameState.TRANSITION) {
-    if (transitionCoolDown == 0) {//Means that the transition is over and the program should move on
+    handleTransition();
+  }
+  /**
+   * This is the biggest state in the program.
+   * All of the game's functionality are in this state
+   **/
+  else if (state == gameState.PLAYING) {
+    //Draws the background. It is the first thing that is done as the background needs to be behind all other objects
+    bg.draw();
+
+    // Checking to see if all the boxes have been destroyed
+    checkLevelComplete();
+
+    handleBalls();
+
+    //Draws the player's bat
+    bat.draw();
+
+    //Draws all the obstacles
+    for (Bat obstacle : obstacles) {
+      obstacle.draw();
+    }
+
+    //Handles effects
+    effects();
+
+    //Handles the breaking boxes
+    breakingBoxes();
+  }
+}
+
+/**
+  * This method handles the shared set up between levels
+  *
+  * It resets variables and initializes the level, thel calls a method
+  * to build the level
+  *
+  * @param levelNum is the level which is being constructed
+  */
+void createLevel(int levelNum){
+  
+  // Reseting variables
+  numOfMulti = 0;
+  numOfSpeed = 0;
+  noCursor();
+  ballSpeedTime = -1;
+  bg.reset();
+  
+  // Initialising level
+  level = levelNum;
+  balls = new ArrayList<Ball>();
+  ball = new Ball(40, 300, 10);
+  balls.add(ball);
+  bat = new Bat(120, 20, mouseX, mouseY, "mouse", 0); 
+  
+  // Creating level
+  if (levelNum == 1){
+    createLevelOne();
+  } else {
+    createLevelTwo();
+  }
+  
+  //Changes game state to playing
+  state = gameState.PLAYING;
+}
+
+/**
+  * This method handles the transition phase between the two levels
+  *
+  * If the transition is complete, it changes the game state to level 
+  * two, otherwise it just continues the transition
+  */
+void handleTransition(){
+  if (transitionCoolDown == 0) {//Means that the transition is over and the program should move on
       state = gameState.LEVEL2;
     } else {
       bg.moveLeft();//Moves the background
       bg.draw();
       transitionCoolDown--;
     }
-  } 
-  /**
-    * This is the biggest state in the program.
-    * All of the game's functionality are in this state
-  **/
-  else if (state == gameState.PLAYING) {
-    //Draws the background. It is the first thing that is done as the background needs to be behind all other objects 
-    bg.draw();
+}
 
-    //Checks to see if the player has destroyed all the boxes
+/**
+  * This method checks to see if the player has destroyed all the boxes
+  *
+  * If they have and they are on level 1, it starts the transition
+  * If they are on level 2, it calls the win screen
+  */
+void checkLevelComplete() {
+  //Checks to see if the player has destroyed all the boxes
     if (obstacles.size() == 0) {
       balls.clear();
       obstacles.clear();
@@ -172,118 +222,56 @@ void draw() {
         state = gameState.COMPLETE;
       }
     }
-
-    //These arraylists are temporary as I am unable to change the arraylists that are being iterated though
-    ArrayList<Ball> newBalls = new ArrayList<Ball>();
-    ArrayList<Ball> removeBalls = new ArrayList<Ball>();
-    ArrayList<Bat> addObstacles = new ArrayList<Bat>();
-
-    for (Ball ball : balls) {
-      
-      //Checks to see if the ball is off the bottom of the screen
-      if (checkDead(ball)) {
-        state = gameState.DEAD;
-      }
-      //Checks to see if the ball has hit the bat
-      checkCollisionBat(bat.position.x, bat.position.y, bat.w, bat.h, ball);
-      
-      /** Iterates through all the obstacles
-        *  - Checks to see if the ball has hit the obstacle
-        *  - If yes, does the correct functionality
-      **/
-      for (int i = 0; i < obstacles.size(); i++) {
-        Bat box = obstacles.get(i);
-        boolean hit = checkCollisionTarget(box.position.x, box.position.y, box.w, box.h, ball);
-        if (hit) {//Box has been hit
-          box.counter -= 1;//Removes 1 from the health of the box
-
-          ///Gets the box's position, sets count and type for future use
-          float blockX = box.position.x;
-          float blockY = box.position.y;
-          String type = "regular";
-          int count = 0;
-
-          //Special Boxes
-          
-          //A multi-box spawns a new ball in
-          if (box.type == "multi") {
-            obstacles.remove(i);//Removes box
-            
-            //Spawns new ball in and adds it to arraylist of balls
-            ball = new Ball(40, 300, 10);
-            newBalls.add(ball);
-            
-            //Spawns in the effect icon
-            Effect multi = new Effect("multi", box.position.x, box.position.y);
-            effects.add(multi);
-            Bat obstacle = new Bat(blockWidth, blockHeight, blockX, blockY, type, count);
-            addObstacles.add(obstacle);
-          }
-          if (obstacles.get(i).type == "speed") {
-            obstacles.remove(i);//Removes box
-            
-            //Sets the timer for how long the effect lasts
-            ballSpeedTime = 150;
-            
-            //Creates a new ball with the updates speed and adds it to the arraylist of balls
-            removeBalls.add(ball);
-            Ball newBall = new Ball(ball.position.x, ball.position.y, 15);
-            newBalls.add(newBall);
-
-            //Spawns in speed effect
-            Effect speed = new Effect("speed", box.position.x, box.position.y);
-            effects.add(speed);
-
-
-            Bat obstacle = new Bat(blockWidth, blockHeight, blockX, blockY, type, count);
-            addObstacles.add(obstacle);
-          }
-        }
-        if (box.counter < 0) {//Means the box has no health left
-          //Creates a duplicate temp box and adds it to the breakingObstacles arraylist. 
-          //This arraylist is iterated over so the break animation plays without the box having collision
-          Bat breaking = new Bat(blockWidth, blockHeight, box.position.x, box.position.y, box.type, 0);
-          breakingObstacles.add(breaking);
-          obstacles.remove(i);//Removes box
-        }
-      }
-      
-      //Draws the ball on the screen
-      ball.draw();
-      if (ballSpeedTime >= 0) {//Decrements the speed effect
-        ballSpeedTime--;
-      }
-      
-      if (ballSpeedTime == 0) {//Means the speed effect is finished
-        //Removes sped up ball and replaces it with a ball of normal speed
-        removeBalls.add(ball);
-        Ball newBall = new Ball(ball.position.x, ball.position.y, 10);
-        newBalls.add(newBall);
-      }
-    }
-    //Changes original arrayLists
-    balls.addAll(newBalls);
-    balls.removeAll(removeBalls);
-    obstacles.addAll(addObstacles);
-
-    //Draws the player's bat
-    bat.draw();
-    
-    //Draws all the obstacles
-    for (Bat obstacle : obstacles) {
-      obstacle.draw();
-    }
- 
-    //Handles effects
-    effects();
-    
-    //Handles the breaking boxes
-    breakingBoxes();
-  }
 }
 
+/**
+  * This method handles the collisions between the balls, boxes, and the bat
+  */
+void handleBalls(){
+  
+  //These arraylists are temporary as I am unable to change the arraylists that are being iterated though
+  newBalls = new ArrayList<Ball>();
+  removeBalls = new ArrayList<Ball>();
+  addObstacles = new ArrayList<Bat>();
 
-//Checks collisions between the ball and the player controlled bat
+  for (Ball ball : balls) {
+
+    //Checks to see if the ball is off the bottom of the screen
+    if (checkDead(ball)) {
+      state = gameState.DEAD;
+    }
+    
+    //Checks to see if the ball has hit the bat
+    checkCollisionBat(bat.position.x, bat.position.y, bat.w, bat.h, ball);
+
+    checkCollisionBox(ball);
+
+    //Draws the ball on the screen
+    ball.draw();
+    if (ballSpeedTime >= 0) {
+      ballSpeedTime--; // Decrements the speed effect
+    }
+
+    if (ballSpeedTime == 0) {//Means the speed effect is finished
+      //Removes sped up ball and replaces it with a ball of normal speed
+      removeBalls.add(ball);
+      Ball newBall = new Ball(ball.position.x, ball.position.y, 10);
+      newBalls.add(newBall);
+    }
+  }
+  //Changes original arrayLists
+  balls.addAll(newBalls);
+  balls.removeAll(removeBalls);
+  obstacles.addAll(addObstacles);
+}
+
+/**
+  * Checks collisions between the ball and the player controlled bat
+  * Also changes the velocity of the ball in the appropriate manor
+  *
+  * @return true if there is a collision
+  * @return false if there isn't
+  */
 boolean checkCollisionBat(float x, float y, float width, float height, Ball ball) {
   float halfWidth = width / 2.0;
   float halfHeight = height / 2.0;
@@ -341,7 +329,98 @@ boolean checkCollisionBat(float x, float y, float width, float height, Ball ball
   return false;
 }
 
-//Checks collisios with the ball and the boxes
+/**
+  * This method checks the collision between the ball and the boxes
+  *
+  * Iterates through all the obstacles
+  *  - Checks to see if the ball has hit the obstacle
+  *  - If yes, does the correct functionality
+  *
+  * @param ball is the current ball to check
+  */
+void checkCollisionBox(Ball ball){
+
+  for (int i = 0; i < obstacles.size(); i++) {
+    Bat box = obstacles.get(i);
+    boolean hit = checkCollisionTarget(box.position.x, box.position.y, box.w, box.h, ball);
+    if (hit) {//Box has been hit
+      box.counter--;//Removes 1 from the health of the box
+
+      handleSpecialBoxes(box, i); // Handling special Boxes
+
+      
+      if (box.counter < 0) {//Means the box has no health left
+        //Creates a duplicate temp box and adds it to the breakingObstacles arraylist.
+        //This arraylist is iterated over so the break animation plays without the box having collision
+        Bat breaking = new Bat(blockWidth, blockHeight, box.position.x, box.position.y, box.type, 0);
+        breakingObstacles.add(breaking);
+        obstacles.remove(i);//Removes box
+      }
+    }
+  }
+}
+
+/**
+  * This method handles the behaviour of the special boxes
+  *
+  * A multi box spawns a new ball in
+  * A speed box speeds up the current ball for a set period of time
+  *
+  * @param box is the box to check
+  * @param i is the index of the box in the arraylist of boxes
+  */
+void handleSpecialBoxes(Bat box, int i){
+  
+  ///Gets the box's position, sets count and type for future use
+  float blockX = box.position.x;
+  float blockY = box.position.y;
+  String type = "regular";
+  int count = 0;
+  
+  //A multi-box spawns a new ball in
+  if (box.type == "multi") {
+    obstacles.remove(i);//Removes box
+
+    //Spawns new ball in and adds it to arraylist of balls
+    ball = new Ball(40, 300, 10);
+    newBalls.add(ball);
+
+    //Spawns in the effect icon
+    Effect multi = new Effect("multi", box.position.x, box.position.y);
+    effects.add(multi);
+    Bat obstacle = new Bat(blockWidth, blockHeight, blockX, blockY, type, count);
+    addObstacles.add(obstacle);
+  }
+  if (obstacles.get(i).type == "speed") {
+    obstacles.remove(i);//Removes box
+
+    //Sets the timer for how long the effect lasts
+    ballSpeedTime = 150;
+
+    //Creates a new ball with the updates speed and adds it to the arraylist of balls
+    removeBalls.add(ball);
+    Ball newBall = new Ball(ball.position.x, ball.position.y, 15);
+    newBalls.add(newBall);
+
+    //Spawns in speed effect
+    Effect speed = new Effect("speed", box.position.x, box.position.y);
+    effects.add(speed);
+
+
+    Bat obstacle = new Bat(blockWidth, blockHeight, blockX, blockY, type, count);
+    addObstacles.add(obstacle);
+  }
+}
+
+/**
+  * This method checks the collision between the bat and the balls ensuring correct bouncage
+  *
+  * @param x the x position of the top left of the bat
+  * @param y the y position of the top left of the bat
+  * @param width is the width of the bat
+  * @param height is the height of the bat
+  * @param ball is the ball to check contact with
+  */
 boolean checkCollisionTarget(float x, float y, float width, float height, Ball ball) {
   float halfWidth = width / 2.0;
   float halfHeight = height / 2.0;
@@ -400,7 +479,12 @@ boolean checkCollisionTarget(float x, float y, float width, float height, Ball b
 }
 
 
-//Creates level One
+/**
+  * Creates the first level
+  *
+  * Spawns in the grid of boxes, including the special boxes
+  *
+  */
 void createLevelOne() {
 
   //Resets the arraylists for the boxes and the effects
@@ -409,7 +493,7 @@ void createLevelOne() {
 
   //Constructs grid of boxes
   for (int row = 0; row < 4; row++) {
-    
+
     //Row gap adjusted
     float blockY = paddingY + row * (blockHeight + gap);
 
@@ -417,7 +501,7 @@ void createLevelOne() {
 
       //Column gap adjusted
       float blockX = paddingX + col * (blockWidth + gap);
-      
+
       //Default values of the boxes
       String type = "regular";
       int count = 0;
@@ -447,11 +531,22 @@ void createLevelOne() {
   }
 }
 
-//Creates level 2, much the same as the method to create level 1.
-// Only real difference is the shape of the grid and where the higher health boxes are
+/**
+  * Creates the second level
+  *
+  * Spawns in the pattern of boxes, including the special boxes
+  *
+  * The difference between the construction of the first and second level is that the 
+  * second level's layout is harder and the boxes have more health
+  *
+  */
 void createLevelTwo() {
+  
+  // Creating new arraylists
   obstacles = new ArrayList<Bat>();
   effects = new ArrayList<Effect>();
+  
+  // Creating boxes
   for (int row = 0; row < numRows2; row++) {
     for (int col = 0; col < numCols2; col++) {
       float blockX2 = col * (blockWidth + gap2);
@@ -469,19 +564,23 @@ void createLevelTwo() {
         if (row == 4 || row == 3) {
           count = 1;
         }
-
+        
+        // Creating the special boxes
         if (random(1) < specialBlockChance) {
           count = 1;
           float blockType = random(1);
           if (blockType < 0.5 && numOfMulti < 3) {
             type = "multi";
             numOfMulti++;
-          } else if ( blockType >= 0.5 && numOfSpeed < 4){
+          } else if ( blockType >= 0.5 && numOfSpeed < 4) {
             type = "speed";
             numOfSpeed++;
           }
         }
+        
+        // Adding the box to the world
         obstacles.add(new Bat(blockWidth, blockHeight, blockX2, blockY2, type, count));
+        
       } else {
         // Air space
       }
@@ -489,7 +588,16 @@ void createLevelTwo() {
   }
 }
 
-void drawStartScreen() {
+/**
+  * Draws the start, death, and win screen
+  *
+  * Does the math for how the hitbox of the start button works
+  * If the start button is clicked, it starts the game
+  *
+  * @param state is the current state of the game, this tells the program what image to draw
+  */
+void drawStartDeathWinScreen(gameState state) {
+  
   //Calculates the hit box of the button
   float buttonX = (width/2+7) - (151 / 2);
   float buttonY = (height - 100) - (50 / 2);
@@ -498,55 +606,32 @@ void drawStartScreen() {
 
   //Checks if the mouse is in the hitbox of the button
   if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth && mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-    image(startScreenHover, width/2, height/2);
+    if (state.equals(gameState.START)){
+      image(startScreenHover, width/2, height/2);
+    } else if (state.equals(gameState.DEAD)) {
+      image(deathScreenHover, width/2, height/2);
+    } else {
+      image(winScreenHover, width/2, height/2);
+    }
     if (mousePressed) {
-      state = gameState.LEVEL1;
+      this.state = gameState.LEVEL1;
     }
   } else {
-    image(startScreenNoHover, width/2, height/2);
+    if (state.equals(gameState.START)){
+      image(startScreenNoHover, width/2, height/2);
+    } else if (state.equals(gameState.DEAD)){
+      image(deathScreenNoHover, width/2, height/2);
+    } else {
+       image(winScreenNoHover, width/2, height/2);
+    }
   }
 }
 
-//Basically same as drawStartScreen, only difference is the image loaded and the state that it goes to if the button is clicked
-void drawDeathScreen() {
-  float buttonX = (width/2+7) - (151 / 2);
-  float buttonY = (height - 100) - (50 / 2);
-  float buttonWidth = 151;
-  float buttonHeight = 50;
-
-  bg.draw();
-
-  if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth && mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-    image(deathScreenHover, width/2, height/2);
-    if (mousePressed) {
-      state = gameState.LEVEL1;
-    }
-  } else {
-    image(deathScreenNoHover, width/2, height/2);
-  }
-}
-
-
-//Again, basically same as previous 2 methods
-void complete() {
-  float buttonX = (width/2+7) - (151 / 2);
-  float buttonY = (height - 100) - (50 / 2);
-  float buttonWidth = 151;
-  float buttonHeight = 50;
-
-  bg.draw();
-
-  if (mouseX >= buttonX && mouseX <= buttonX + buttonWidth && mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-    image(winScreenHover, width/2, height/2);
-    if (mousePressed) {
-      state = gameState.LEVEL1;
-    }
-  } else {
-    image(winScreenNoHover, width/2, height/2);
-  }
-}
-
-//Checks if the ball is below the bottom of the canvas
+/**
+  * Checks if the ball is below the bottom of the canvas
+  * 
+  * @return true if it has, false if not
+  */
 boolean checkDead(Ball ball) {
   if (ball.position.y >= canvasHeight + ball.radius) {
     return true;
@@ -555,25 +640,31 @@ boolean checkDead(Ball ball) {
   }
 }
 
-//Handles the animation of the breaking boxes
-void breakingBoxes(){
+/**
+  * Handles the animation of the breaking boxes, incrementing through each frame
+  * After the animation is over, it removes the box from the arraylist
+  */
+void breakingBoxes() {
   //Resets temp arraylist of breakingBoxes to remove
   ArrayList<Bat> removeBreakingObstacles = new ArrayList<Bat>();
-    if (!breakingObstacles.isEmpty()) {
-      for (Bat box : breakingObstacles) {
-        if (box.frame > 7) {//Means the animation has played out fully and the box shouldn't exist anymore
-          removeBreakingObstacles.add(box);
-        } else {
-          box.incrementAnim();//Moves animation to next frame
-          box.draw();
-        }
+  if (!breakingObstacles.isEmpty()) {
+    for (Bat box : breakingObstacles) {
+      if (box.frame > 7) {//Means the animation has played out fully and the box shouldn't exist anymore
+        removeBreakingObstacles.add(box);
+      } else {
+        box.incrementAnim();//Moves animation to next frame
+        box.draw();
       }
-      breakingObstacles.removeAll(removeBreakingObstacles);
-    } 
+    }
+    breakingObstacles.removeAll(removeBreakingObstacles);
+  }
 }
 
-//Same as last method, only diffeerence is when the object is removed (when it goes off the bottom of the screen)
-void effects(){
+/**
+  * Handles the animation of the effects as it moves them down the screen
+  * Removes the effect when it is off the screen
+  */
+void effects() {
   ArrayList<Effect> removeEffect = new ArrayList<Effect>();
   for (Effect effect : effects) {
     if (effect.y > canvasHeight) {
@@ -582,5 +673,5 @@ void effects(){
     effect.draw();
     effect.move(10);
   }
-  effects.removeAll(removeEffect); 
+  effects.removeAll(removeEffect);
 }

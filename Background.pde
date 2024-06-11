@@ -7,10 +7,11 @@ class Background {
 
   int bgSpeed = 5;
 
-  /**Background Contructor
-   * - loads the 3 background images
-   * - sets where to start displaying the images
-   **/
+  /**
+    * Background Contructor
+    * - loads the 3 background images
+    * - sets where to start displaying the images
+    */
   Background() {
     bg1 = loadImage("sprites/background/foregroundResized.png");
     bg2 = loadImage("sprites/background/midgroundResized.png");
